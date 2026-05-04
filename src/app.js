@@ -19,7 +19,7 @@
  *   - Direct mode flags plus an in-app Z-cycle for the public launcher set
  *   - Automatic config detection and model setup for both tools
  *   - JSON config stored in ~/.free-coding-models.json (auto-migrates from old plain-text)
- *   - Multi-provider support via sources.js (NIM/Groq/Cerebras/OpenRouter/GitHub Models/... — extensible)
+ *   - Multi-provider support via sources.js (NIM/Groq/Cerebras/GitHub Models/Mistral/OpenRouter/... — extensible)
  *   - Settings screen (P key) to manage API keys, provider toggles, manual updates, and provider-key diagnostics
  *   - Install Endpoints flow (Settings / Command Palette) to push provider catalogs into OpenCode, OpenClaw, Crush, and Goose
  *   - Favorites system: toggle with F, switch pinning mode with Y, persist between sessions
@@ -59,7 +59,7 @@
  *   ⚙️ Configuration:
  *   - API keys stored per-provider in ~/.free-coding-models.json (0600 perms)
  *   - Old ~/.free-coding-models plain-text auto-migrated as nvidia key on first run
- *   - Env vars override config: NVIDIA_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY, OPENROUTER_API_KEY, HUGGINGFACE_API_KEY/HF_TOKEN, REPLICATE_API_TOKEN, DEEPINFRA_API_KEY/DEEPINFRA_TOKEN, FIREWORKS_API_KEY, SILICONFLOW_API_KEY, TOGETHER_API_KEY, PERPLEXITY_API_KEY, ZAI_API_KEY, etc.
+ *   - Env vars override config: NVIDIA_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY, OPENROUTER_API_KEY, GITHUB_TOKEN, MISTRAL_API_KEY, SCALEWAY_API_KEY, GOOGLE_API_KEY, CLOUDFLARE_API_TOKEN, DASHSCOPE_API_KEY, ZAI_API_KEY, etc.
  *   - ZAI (z.ai) uses a non-standard base path; cloudflare needs CLOUDFLARE_ACCOUNT_ID in env.
  *   - Cloudflare Workers AI requires both CLOUDFLARE_API_TOKEN (or CLOUDFLARE_API_KEY) and CLOUDFLARE_ACCOUNT_ID
  *   - Models loaded from sources.js — all provider/model definitions are centralized there

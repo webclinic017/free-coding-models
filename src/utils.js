@@ -16,8 +16,8 @@
  * 📖 Result object shape (created by the main CLI, consumed by these functions):
  *    {
  *      idx: number,          // 1-based index for display
- *      modelId: string,      // e.g. "deepseek-ai/deepseek-v3.2"
- *      label: string,        // e.g. "DeepSeek V3.2" (human-friendly name)
+ *      modelId: string,      // e.g. "deepseek-ai/deepseek-v4-flash"
+ *      label: string,        // e.g. "DeepSeek V4 Flash" (human-friendly name)
  *      tier: string,         // e.g. "S+", "A", "B+" — from sources.js
  *      sweScore: string,     // e.g. "49.2%", "73.1%" — SWE-bench Verified score
  *      status: string,       // "pending" | "up" | "down" | "timeout"
@@ -781,11 +781,11 @@ export function getVersionStatusInfo(updateState, latestVersion, startupLatestVe
  *   [
  *     {
  *       "rank": 1,
- *       "modelId": "nvidia/deepseek-ai/deepseek-v3.2",
- *       "label": "DeepSeek V3.2",
+ *       "modelId": "nvidia/deepseek-ai/deepseek-v4-flash",
+ *       "label": "DeepSeek V4 Flash",
  *       "provider": "nvidia",
  *       "tier": "S+",
- *       "sweScore": "73.1%",
+ *       "sweScore": "72.0%",
  *       "context": "128k",
  *       "latestPing": 245,
  *       "avgPing": 260,

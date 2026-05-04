@@ -40,7 +40,7 @@
  *       "zai":        { "enabled": true }
  *     },
  *     "favorites": [
- *       "nvidia/deepseek-ai/deepseek-v3.2"
+ *       "nvidia/deepseek-ai/deepseek-v4-flash"
  *     ],
  *     "telemetry": {
  *       "enabled": true,

@@ -14,7 +14,7 @@
  *   {
  *     "timestamp": 1712345678901,           // Last cache write time (ms since epoch)
  *     "models": {
- *       "nvidia/deepseek-v3.2": {
+ *       "nvidia/deepseek-ai/deepseek-v4-flash": {
  *         "avg": 245,
  *         "p95": 312,
  *         "jitter": 45,

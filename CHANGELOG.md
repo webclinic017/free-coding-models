@@ -2,35 +2,52 @@
 
 ### Added
 
-- **Smart Router Daemon** — Background daemon that routes chat completions through multiple providers with automatic failover. Run `free-coding-models --daemon` to start the router, or `--daemon-listen` to attach to an existing one.
-- **`--sync-set` flag** — Triggers automatic model discovery and live probing for all configured providers, updating the local catalog with discovered IDs on the fly.
-- **Kilo CLI integration** — New external tool launcher. `free-coding-models --opencode-web` opens the OpenCode WebUI directly.
-- **Router Dashboard** — Built-in web dashboard at `http://localhost:60736` (or next free port) showing router health, model latency heatmap, failover events, and quota usage. Press `D` in the TUI to toggle it.
-- **Discord commit log webhook** — New `DISCORD_WEBHOOK_URL` env var sends compact commit notifications to a Discord channel on every push to main.
-- **Graphify tool integration** — AI-powered codebase analysis via graph theory. Run manually or let the agent use it for architecture tracking.
+- **Major free-model catalog refresh** — Rebuilt the active catalog to **180 models across 16 vetted free or free-limited providers**.
+- **GitHub Models provider** — Added GitHub Models with 15 API models and `GITHUB_TOKEN` / `GH_TOKEN` / `GITHUB_MODELS_TOKEN` support.
+- **Mistral La Plateforme provider** — Added a general Mistral provider for Experiment-plan usage, separate from the existing Codestral shortcut provider for backward compatibility.
+- **OpenRouter live free-model coverage** — Added current free models such as `tencent/hy3-preview:free`, Poolside Laguna, Ling 2.6, Nemotron 3, OpenRouter Free, Owl Alpha, Gemma 4, and LFM free models.
+- **Smart Router Daemon** — Added a local OpenAI-compatible daemon with model failover, health tracking, daemon status, dashboard integration, and router set persistence.
+- **`--sync-set` router discovery** — Added automatic model discovery and live probing for configured providers so router sets can be rebuilt from working models.
+- **Router Dashboard** — Added a local web dashboard for router health, latency heatmaps, failover activity, and quota visibility.
+- **Kilo CLI integration** — Added Kilo as a launch target and endpoint install target.
+- **Discord commit log webhook** — Added `DISCORD_WEBHOOK_URL` support for compact push notifications.
+- **Graphify integration** — Added codebase graph analysis artifacts and tracking support for architecture inspection.
 
 ### Changed
 
-- **Free provider catalog refreshed** — Rebuilt catalog to 165 models across 15 providers. Key changes: removed deprecated SambaNova `DeepSeek-V3.2`, noted upcoming deprecations for `qwen-3-235b` (Cerebras, May 27), `kimi-k2-thinking` and `devstral-2` (NIM preview).
-- **Router model set expanded to 8 candidates** — Router now tries up to 8 models before failing over, up from the previous limit.
-- **Router failover behavior hardened** — Returns 401/429 instead of 503 when all models fail due to auth or quota (prevents infinite client retry loops). Clears request timeout after headers return to avoid aborting long running streams.
-- **Provider filters now derive from the catalog** — Command palette provider filter auto-updates from catalog, no longer hardcoded.
+- **Free-provider policy tightened** — Removed paid-only, trial-credit-only, shutdown, extremely tiny-credit, unclear, and tool-specific providers from the active catalog.
+- **Providers removed from active core** — `iFlow`, `Together AI`, `Perplexity API`, `DeepInfra`, `Replicate`, `Fireworks`, `Hyperbolic`, `Hugging Face`, `SiliconFlow`, `Chutes AI`, and `Rovo` are now documented outside the core free-provider list when useful.
+- **Provider catalogs refreshed** — Updated NVIDIA NIM, OpenRouter, Google AI Studio, Gemini CLI, Cloudflare Workers AI, OVHcloud AI Endpoints, ZAI, SambaNova, Scaleway, Qwen DashScope, and OpenCode Zen model IDs.
+- **SambaNova catalog corrected** — Reduced the provider to the current public model set and restored `DeepSeek-V3.2` after verifying it is present in the live `/v1/models` endpoint.
+- **Google/Gemini IDs corrected** — Replaced stale Gemma-style IDs with current Gemini API model IDs for Google AI Studio and Gemini CLI.
+- **ZAI catalog reduced** — Kept only free Flash models in the active provider list.
+- **Scaleway EOL cleanup** — Removed EOL entries from the active Scaleway list and kept only useful current text models.
+- **Codestral key handling normalized** — `MISTRAL_API_KEY` is now the primary environment variable; `CODESTRAL_API_KEY` remains accepted as an alias.
+- **OpenRouter free detection improved** — Live OpenRouter discovery now treats zero-priced public models as free even when their ID does not end in `:free`.
+- **Provider filters now derive from the catalog** — Command Palette provider filters are generated from `sources`, so new providers do not need a hardcoded UI update.
+- **Router model set expanded** — Default router candidate selection now supports up to 8 models and uses refreshed high-ranking defaults.
+- **External tool configs generalized** — OpenCode and Kilo can now auto-configure newly added OpenAI-compatible providers through shared provider metadata.
 
 ### Fixed
 
-- **Router strips unsupported params from upstream requests** — Prevents proxy errors when clients send custom non-standard parameters.
-- **Content-Type canonicalization** — Proxy now normalizes `Content-Type` headers from upstream providers to standard OpenAI format.
-- **Codestral key handling** — `MISTRAL_API_KEY` is now the primary env var; `CODESTRAL_API_KEY` remains accepted as alias.
-- **OpenCode Desktop launcher** — Updated to handle new OpenAI-compatible providers like GitHub Models without one-off branches.
+- **Router upstream hardening** — Fixed unsupported request parameter stripping, retryable failover behavior, content-type canonicalization, and long-stream timeout handling.
+- **Router auth/quota semantics** — Router now returns 401/429 when all candidates fail because of auth or quota instead of masking those cases as 503.
+- **OpenRouter sync-set filtering** — Router discovery no longer drops `openrouter/free` and `openrouter/owl-alpha` just because their IDs do not end with `:free`.
+- **Provider key probes** — Updated probe model priorities for NVIDIA, SambaNova, GitHub Models, and Mistral to avoid stale or slow first-choice checks.
+- **OpenCode Desktop launcher** — Fixed launcher setup for newly added OpenAI-compatible providers such as GitHub Models and Mistral.
+- **pnpm lock conflict** — Regenerated the lockfile from `package.json` to resolve the merge conflict state.
 
 ### Docs
 
-- **Router PRD** — Full design doc at `ROUTER-UX-ANALYSIS.md` covering architecture, failover logic, UX patterns, and rollout plan.
-- **Sync-set docs** — New `docs/sync-set.md` explains the flag, how model discovery works, and how to interpret probing results.
-- **README reorganized** — Moved "Other Free AI Resources" to the bottom; updated provider/model counts; cleaned up feature groupings.
+- **README provider table updated** — Updated badges, provider count, model count, free-tier descriptions, environment variables, audit cleanup notes, and caveats.
+- **Provider inclusion policy documented** — Added explicit notes explaining why Vercel AI Gateway, Cohere, Ollama Cloud, trial-credit providers, and tiny-credit providers are not treated as core free providers.
+- **Other Free AI Resources reorganized** — Moved curated external resources to the bottom of the README and separated permanent free tiers from trial-credit providers.
+- **Router PRD and sync-set docs** — Added and updated router design notes and `--sync-set` documentation.
+- **Contributors updated** — Added new contributor acknowledgements.
 
 ### Dependencies
 
-- **vite** bumped to 8.0.10
-- **vite-plus** bumped to 0.1.20
-- **react** bumped to 19.2.5
+- **react** bumped to 19.2.5.
+- **vite** bumped to 8.0.10.
+- **vite-plus** bumped to 0.1.20.
+- **pnpm/action-setup** bumped to 6.
