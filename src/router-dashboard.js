@@ -39,6 +39,7 @@
  * @see ./key-handler.js — dashboard key bindings
  */
 
+import chalk from 'chalk'
 import { existsSync, readFileSync } from 'node:fs'
 import { displayWidth, padEndDisplay, sliceOverlayLines, tintOverlayLines } from './render-helpers.js'
 import { ROUTER_DEFAULT_PORT, ROUTER_MAX_PORT, ROUTER_PID_PATH, ROUTER_PORT_PATH, getRouterPortRange } from './router-daemon.js'
@@ -505,6 +506,7 @@ export function startRouterDashboardEventStream(state, options = {}) {
 export function openRouterDashboardOverlay(state) {
   state.routerDashboardOpen = true
   state.routerDashboardScrollOffset = 0
+  state.routerDashboardCursorIndex = 0
   state.routerDashboardStatus = state.routerDashboardStatus || 'loading'
   startRouterDashboardPolling(state)
   // 📖 Fire app_router_install on first Shift+R dashboard open for upgrade-path users
@@ -521,6 +523,7 @@ export function openRouterDashboardOverlay(state) {
 export function closeRouterDashboardOverlay(state) {
   state.routerDashboardOpen = false
   state.routerDashboardScrollOffset = 0
+  state.routerDashboardCursorIndex = 0
   stopRouterDashboardClient(state)
 }
 
@@ -800,73 +803,133 @@ export function renderRouterDashboard(state, deps = {}) {
   const status = state.routerDashboardStatus || 'idle'
   const width = Math.max(80, state.terminalCols || 80)
   const separator = themeColors.dim('─'.repeat(Math.max(20, width - 6)))
-  const requestRows = requestLogRows(state, snapshot)
-  const eventStatus = state.routerDashboardEventStatus || 'idle'
-  const updatedAt = state.routerDashboardLastUpdatedAt
-    ? new Date(state.routerDashboardLastUpdatedAt).toLocaleTimeString()
-    : 'never'
 
-  lines.push(`  ${themeColors.accent('🚀')} ${themeColors.accentBold('free-coding-models')} ${themeColors.dim(LOCAL_VERSION ? `v${LOCAL_VERSION}` : '')}`)
-  lines.push(`  ${themeColors.textBold('🔀 FCM Router Dashboard')}  ${themeColors.dim('Shift+R from main table')}`)
+  // 📖 Loading animation frames for the "starting" state — reuses the same
+  // 📖 visual language as the ping indicators in the main table.
+  const LOADING_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+  const loadingGlyph = LOADING_FRAMES[(state.frame || 0) % LOADING_FRAMES.length]
+
+  // ── Big Status Banner ───────────────────────────────────────────────────────
+  // 📖 Visual hierarchy: the daemon status is THE most important info, shown as
+  // 📖 a large colored block that users can understand at a single glance.
+  const bannerWidth = Math.max(40, width - 6)
+  const isRunning = status === 'ready' || status === 'partial'
+  const isLoading = status === 'loading'
+  const isStopped = !isRunning && !isLoading
+
+  let bannerText, bannerBgRgb, bannerFgRgb
+  if (isRunning) {
+    bannerText = '  ROUTER DAEMON RUNNING  '
+    bannerBgRgb = [22, 120, 60]   // green
+    bannerFgRgb = [255, 255, 255]
+  } else if (isLoading) {
+    bannerText = `  ROUTER DAEMON STARTING ${loadingGlyph}  `
+    bannerBgRgb = [180, 100, 0]   // orange
+    bannerFgRgb = [255, 255, 255]
+  } else {
+    bannerText = '  ROUTER DAEMON STOPPED  '
+    bannerBgRgb = [160, 30, 30]   // red
+    bannerFgRgb = [255, 255, 255]
+  }
+  // 📖 Center the text inside a full-width colored bar
+  const bannerPadTotal = Math.max(0, bannerWidth - displayWidth(bannerText))
+  const bannerPadLeft = Math.floor(bannerPadTotal / 2)
+  const bannerPadRight = bannerPadTotal - bannerPadLeft
+  const bannerLine = ' '.repeat(bannerPadLeft) + bannerText + ' '.repeat(bannerPadRight)
+  const paintBanner = chalk.bgRgb(...bannerBgRgb).rgb(...bannerFgRgb).bold
+
   lines.push('')
-  lines.push(`  Daemon: ${statusBadge(status, snapshot)}  ${themeColors.dim('Port:')} ${themeColors.info(String(snapshot.port || state.routerDashboardPort || '—'))}  ${themeColors.dim('PID:')} ${snapshot.pid || '—'}  ${themeColors.dim('SSE:')} ${eventStatus}`)
-  lines.push(`  Set: ${themeColors.textBold(snapshot.activeSet)}  ${themeColors.dim('Models:')} ${snapshot.activeModelCount}  ${themeColors.dim('Uptime:')} ${formatRouterDuration(snapshot.uptimeSeconds)}  ${themeColors.dim('Requests:')} ${snapshot.requestsRouted}  ${themeColors.dim('In flight:')} ${snapshot.inFlight}`)
-  lines.push(`  Probes: ${themeColors.info(snapshot.probeMode)}  ${themeColors.dim('Last probe:')} ${formatAge(snapshot.lastProbeAt)}  ${themeColors.dim('Last refresh:')} ${updatedAt}`)
-  if (state.routerDashboardError) lines.push(`  ${themeColors.error(`Dashboard note: ${state.routerDashboardError}`)}`)
-  if (state.routerDashboardEventError) lines.push(`  ${themeColors.warning(`Event stream: ${state.routerDashboardEventError}`)}`)
-  const notice = renderNotice(state.routerDashboardNotice)
-  if (notice) lines.push(notice)
-  if (snapshot.setCount === 0) {
-    lines.push(`  ${themeColors.warningBold('⚠ No router sets found. Press Y to install providers into FCM Router, then restart the daemon.')}`)
+  lines.push(`  ${paintBanner(bannerLine)}`)
+  lines.push('')
+
+  // ── Quick Setup (connection info) ───────────────────────────────────────────
+  const port = snapshot.port || state.routerDashboardPort || '—'
+  const baseUrl = isRunning ? `http://localhost:${port}/v1` : `http://localhost:${port}/v1`
+  lines.push(`  ${themeColors.textBold('Quick Setup')} ${themeColors.dim('— paste into your coding tool')}`)
+  lines.push(`  ${themeColors.dim('URL')}     ${themeColors.info(baseUrl)}`)
+  lines.push(`  ${themeColors.dim('Model')}   ${themeColors.info('fcm')}`)
+  lines.push(`  ${themeColors.dim('API Key')} ${themeColors.info('fcm-local')}`)
+  if (isRunning) {
+    lines.push(`  ${themeColors.dim('Uptime')}  ${themeColors.success(formatRouterDuration(snapshot.uptimeSeconds))}  ${themeColors.dim('Requests routed:')} ${themeColors.info(String(snapshot.requestsRouted))}`)
   }
   lines.push(`  ${separator}`)
   lines.push('')
 
-  lines.push(`  ${themeColors.textBold('Model Health / Circuit Breakers')}`)
-  if (snapshot.models.length === 0) {
-    lines.push(`  ${themeColors.dim('No model health rows available yet. Start the daemon or wait for /stats to answer.')}`)
+  // ── Favorites / Router Fallback Models ──────────────────────────────────────
+  // 📖 Instead of the old "sets" system, show the user's favorites from the main
+  // 📖 table as the router fallback chain. #1 = tried first, #2 = next, etc.
+  lines.push(`  ${themeColors.textBold('Router Models')} ${themeColors.dim('— your favorites, in fallback order')}`)
+  lines.push(`  ${themeColors.dim('Star models with F in the main table. Ctrl+↑↓ to reorder here.')}`)
+  lines.push('')
+
+  // 📖 Build the favorites list — pull from config.favorites + daemon health data
+  const favorites = Array.isArray(state.config?.favorites) ? state.config.favorites : []
+  const cursor = state.routerDashboardCursorIndex ?? 0
+
+  if (favorites.length === 0) {
+    lines.push(`  ${themeColors.warning('No favorites yet.')} ${themeColors.dim('Press Esc, then F on any model to add it.')}`)
   } else {
-    // 📖 Keycap emoji digits 1️⃣…🔟 — large, colorful, instantly readable in the
-    // 📖 router order column. Capped at 10 because the active set should never
-    // 📖 contain more than 10 priority slots in practice.
+    // 📖 Priority keycap glyphs for the fallback order
     const KEYCAPS = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟']
-    const priorityGlyph = (priority) => {
-      const n = Number(priority)
-      if (Number.isFinite(n) && n >= 1 && n <= KEYCAPS.length) return KEYCAPS[n - 1]
-      return '—'
+    const priorityGlyph = (i) => i < KEYCAPS.length ? KEYCAPS[i] : `${i + 1}.`
+
+    // 📖 Match favorites to daemon health data for live status
+    const healthByKey = new Map()
+    for (const m of snapshot.models) {
+      healthByKey.set(`${m.provider}/${m.model}`, m)
     }
-    const header = `  ${padEndDisplay('#', 4)} ${padEndDisplay('Provider', 12)} ${padEndDisplay('Model', 30)} ${padEndDisplay('State', 12)} ${padEndDisplay('P95', 8)} ${padEndDisplay('Up', 5)} Score`
-    lines.push(themeColors.dim(header))
-    for (const model of snapshot.models.slice(0, 12)) {
-      const latency = Number.isFinite(model.last_latency_ms) ? `${Math.round(model.last_latency_ms)}ms` : '—'
-      const score = Number.isFinite(model.score) ? model.score.toFixed(2) : '—'
-      const errorSuffix = model.last_error ? themeColors.dim(`  ${compactText(model.last_error, 22).trimEnd()}`) : ''
-      lines.push(
-        `  ${padEndDisplay(priorityGlyph(model.priority), 4)} ` +
-        `${compactText(model.provider, 12)} ` +
-        `${compactText(model.model, 30)} ` +
-        `${padEndDisplay(modelStateBadge(model.state), 12)} ` +
-        `${padEndDisplay(latency, 8)} ` +
-        `${padEndDisplay(formatPercent(model.uptime), 5)} ` +
-        `${score}${errorSuffix}`
-      )
+
+    for (let i = 0; i < favorites.length; i++) {
+      const favKey = favorites[i]
+      const health = healthByKey.get(favKey)
+      const isCursorRow = i === cursor
+
+      // 📖 Human-readable health label instead of circuit breaker jargon
+      let healthLabel
+      if (!isRunning) {
+        healthLabel = themeColors.dim('—')
+      } else if (health) {
+        const st = safeString(health.state, 'UNKNOWN').toUpperCase()
+        if (st === 'CLOSED') healthLabel = themeColors.success('✅ Healthy')
+        else if (st === 'HALF_OPEN') healthLabel = themeColors.warning('⚠️  Recovering')
+        else if (st === 'OPEN') healthLabel = themeColors.error('❌ Down')
+        else if (st === 'AUTH_ERROR') healthLabel = themeColors.error('🔑 Auth Error')
+        else if (st === 'STALE') healthLabel = themeColors.dim('💀 Stale')
+        else if (st === 'UNSUPPORTED') healthLabel = themeColors.dim('✖ Unsupported')
+        else healthLabel = themeColors.dim(`? ${st}`)
+      } else {
+        healthLabel = themeColors.dim('⏳ Pending')
+      }
+
+      const latency = health && Number.isFinite(health.last_latency_ms)
+        ? themeColors.dim(`${Math.round(health.last_latency_ms)}ms`)
+        : ''
+
+      const rowText = `  ${padEndDisplay(priorityGlyph(i), 4)} ${padEndDisplay(favKey, 42)} ${padEndDisplay(healthLabel, 18)} ${latency}`
+
+      if (isCursorRow) {
+        lines.push(themeColors.bgCursor(rowText + ' '.repeat(Math.max(0, width - displayWidth(rowText) - 3))))
+      } else {
+        lines.push(rowText)
+      }
     }
-    if (snapshot.models.length > 12) lines.push(themeColors.dim(`  … ${snapshot.models.length - 12} more models in active set`))
   }
 
   lines.push('')
-  lines.push(`  ${themeColors.textBold('Token Summary')}`)
-  lines.push(`  Today: ${themeColors.info(formatTokenTotalCompact(snapshot.tokens.today.total_tokens))} tok  ${themeColors.dim('Requests:')} ${snapshot.tokens.today.requests}  ${themeColors.dim('Prompt/Completion:')} ${formatTokenTotalCompact(snapshot.tokens.today.prompt_tokens)} / ${formatTokenTotalCompact(snapshot.tokens.today.completion_tokens)}`)
-  lines.push(`  All-time: ${themeColors.info(formatTokenTotalCompact(snapshot.tokens.all_time.total_tokens))} tok  ${themeColors.dim('Requests:')} ${snapshot.tokens.all_time.requests}  ${themeColors.dim('Top today:')} ${compactText(topTokenModel(snapshot.tokens), Math.max(18, width - 58)).trimEnd()}`)
-
+  lines.push(`  ${separator}`)
   lines.push('')
-  lines.push(`  ${themeColors.textBold('Live Request Log')}`)
-  if (requestRows.length === 0) {
-    lines.push(`  ${themeColors.dim('No routed requests in the local dashboard log yet.')}`)
-  } else {
-    const header = `  ${padEndDisplay('Time', 10)} ${padEndDisplay('Model', 34)} ${padEndDisplay('Status', 8)} ${padEndDisplay('Latency', 9)} ${padEndDisplay('Tokens', 9)} Detail`
+
+  // ── Token Summary (compact) ─────────────────────────────────────────────────
+  lines.push(`  ${themeColors.textBold('Tokens')}  ${themeColors.dim('Today:')} ${themeColors.info(formatTokenTotalCompact(snapshot.tokens.today.total_tokens))}  ${themeColors.dim('All-time:')} ${themeColors.info(formatTokenTotalCompact(snapshot.tokens.all_time.total_tokens))}  ${themeColors.dim('Requests:')} ${snapshot.tokens.today.requests}/${snapshot.tokens.all_time.requests}`)
+
+  // ── Live Request Log (compact) ──────────────────────────────────────────────
+  const requestRows = requestLogRows(state, snapshot)
+  if (requestRows.length > 0) {
+    lines.push('')
+    lines.push(`  ${themeColors.textBold('Recent Requests')}`)
+    const header = `  ${padEndDisplay('Time', 10)} ${padEndDisplay('Model', 34)} ${padEndDisplay('Status', 8)} ${padEndDisplay('Latency', 9)} Detail`
     lines.push(themeColors.dim(header))
-    for (const row of requestRows) {
+    for (const row of requestRows.slice(0, 6)) {
       const atMs = Date.parse(row.at)
       const time = Number.isFinite(atMs) ? new Date(atMs).toLocaleTimeString() : '—'
       const statusText = String(row.status)
@@ -882,18 +945,33 @@ export function renderRouterDashboard(state, deps = {}) {
         `${compactText(row.model, 34)} ` +
         `${padEndDisplay(statusColor(statusText), 8)} ` +
         `${padEndDisplay(latency, 9)} ` +
-        `${padEndDisplay(formatTokenTotalCompact(row.tokens), 9)} ` +
-        `${compactText(detail, Math.max(10, width - 78)).trimEnd()}`
+        `${compactText(detail, Math.max(10, width - 68)).trimEnd()}`
       )
     }
   }
 
+  // ── Health check speed ──────────────────────────────────────────────────────
+  const probeLabel = snapshot.probeMode === 'eco' ? 'Slow'
+    : snapshot.probeMode === 'aggressive' ? 'Fast'
+    : 'Normal'
+
+  // ── Error/Notice display ────────────────────────────────────────────────────
+  if (state.routerDashboardError && isStopped) {
+    lines.push('')
+    lines.push(`  ${themeColors.dim('Start the daemon with:')} ${themeColors.info('free-coding-models --daemon-bg')}`)
+  } else if (state.routerDashboardError) {
+    lines.push('')
+    lines.push(`  ${themeColors.warning(state.routerDashboardError)}`)
+  }
+  const notice = renderNotice(state.routerDashboardNotice)
+  if (notice) {
+    lines.push('')
+    lines.push(notice)
+  }
+
+  // ── Footer ──────────────────────────────────────────────────────────────────
   lines.push('')
-  const lastEvent = Array.isArray(state.routerDashboardEvents) && state.routerDashboardEvents[0]
-    ? `${state.routerDashboardEvents[0].event} @ ${new Date(state.routerDashboardEvents[0].at).toLocaleTimeString()}`
-    : 'none'
-  lines.push(`  ${themeColors.dim(`Endpoint: ${state.routerDashboardBaseUrl || 'not connected'}  •  Last SSE event: ${lastEvent}`)}`)
-  lines.push(`  ${themeColors.hotkey('S')} ${themeColors.dim('Switch set')}  ${themeColors.dim('•')}  ${themeColors.hotkey('I')} ${themeColors.dim('Probe mode')}  ${themeColors.dim('•')}  ${themeColors.hotkey('R')} ${themeColors.dim('Restart (Phase 7)')}  ${themeColors.dim('•')}  ${themeColors.hotkey('C')} ${themeColors.dim('Clear log')}  ${themeColors.dim('•')}  ${themeColors.hotkey('P')} ${themeColors.dim('Pause probes (disabled)')}  ${themeColors.dim('•')}  ${themeColors.hotkey('Esc')} ${themeColors.dim('Back')}`)
+  lines.push(`  ${themeColors.hotkey('↑↓')} ${themeColors.dim('Navigate')}  ${themeColors.dim('•')}  ${themeColors.hotkey('Ctrl+↑↓')} ${themeColors.dim('Reorder')}  ${themeColors.dim('•')}  ${themeColors.hotkey('I')} ${themeColors.dim(`Health check: ${probeLabel}`)}  ${themeColors.dim('•')}  ${themeColors.hotkey('C')} ${themeColors.dim('Clear log')}  ${themeColors.dim('•')}  ${themeColors.hotkey('Esc')} ${themeColors.dim('Back')}`)
 
   const { visible, offset } = sliceOverlayLines(lines, state.routerDashboardScrollOffset || 0, state.terminalRows || 24)
   state.routerDashboardScrollOffset = offset

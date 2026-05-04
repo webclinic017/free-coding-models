@@ -507,7 +507,7 @@ export function renderTable(results, pendingPings, frame, cursor = null, sortCol
           ? chalk.rgb(100, 200, 80).bold(ctxRaw.padEnd(W_CTX))
           : numK <= 400
           ? chalk.rgb(0, 255, 200).bold(ctxRaw.padEnd(W_CTX))
-          : chalk.rgb(0, 255, 255).bold().underline(ctxRaw.padEnd(W_CTX))
+          : chalk.rgb(0, 255, 255).bold.underline(ctxRaw.padEnd(W_CTX))
       } else {
         ctxCell = themeColors.dim(ctxRaw.padEnd(W_CTX))
       }

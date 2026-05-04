@@ -1434,22 +1434,68 @@ export function createKeyHandler(ctx) {
 
     // 📖 Profile system removed - API keys now persist permanently across all sessions
 
-    // 📖 Router Dashboard captures local dashboard controls while open so keys
-    // 📖 like S/I/R/C do not leak through to sort/filter actions in the table.
+    // 📖 Router Dashboard: ↑↓ navigate favorites list, Ctrl+↑↓ reorder,
+    // 📖 I cycles health check speed, C clears log, Esc goes back.
     if (state.routerDashboardOpen) {
       if (key.ctrl && key.name === 'c') { exit(0); return }
+      const favorites = Array.isArray(state.config?.favorites) ? state.config.favorites : []
+      const maxCursor = Math.max(0, favorites.length - 1)
       const pageStep = Math.max(1, (state.terminalRows || 1) - 4)
 
       if (key.name === 'escape') {
         closeRouterDashboardOverlay(state)
         return
       }
+
+      // 📖 Ctrl+↑: move the selected favorite UP in fallback priority
+      if (key.ctrl && key.name === 'up') {
+        if (favorites.length > 0) {
+          const cursorIdx = state.routerDashboardCursorIndex ?? 0
+          const favKey = favorites[cursorIdx]
+          if (favKey) {
+            const slashIdx = favKey.indexOf('/')
+            const providerKey = slashIdx >= 0 ? favKey.slice(0, slashIdx) : favKey
+            const modelId = slashIdx >= 0 ? favKey.slice(slashIdx + 1) : favKey
+            const moved = reorderFavorite(state.config, providerKey, modelId, 'up')
+            if (moved) {
+              state.routerDashboardCursorIndex = Math.max(0, cursorIdx - 1)
+              syncFavoriteFlags(state.results, state.config)
+            }
+          }
+        }
+        return
+      }
+
+      // 📖 Ctrl+↓: move the selected favorite DOWN in fallback priority
+      if (key.ctrl && key.name === 'down') {
+        if (favorites.length > 0) {
+          const cursorIdx = state.routerDashboardCursorIndex ?? 0
+          const favKey = favorites[cursorIdx]
+          if (favKey) {
+            const slashIdx = favKey.indexOf('/')
+            const providerKey = slashIdx >= 0 ? favKey.slice(0, slashIdx) : favKey
+            const modelId = slashIdx >= 0 ? favKey.slice(slashIdx + 1) : favKey
+            const moved = reorderFavorite(state.config, providerKey, modelId, 'down')
+            if (moved) {
+              state.routerDashboardCursorIndex = Math.min(maxCursor, cursorIdx + 1)
+              syncFavoriteFlags(state.results, state.config)
+            }
+          }
+        }
+        return
+      }
+
+      // 📖 ↑/↓: navigate the favorites list cursor
       if (key.name === 'up' || key.name === 'k') {
-        state.routerDashboardScrollOffset = Math.max(0, (state.routerDashboardScrollOffset || 0) - 1)
+        if (favorites.length > 0) {
+          state.routerDashboardCursorIndex = Math.max(0, (state.routerDashboardCursorIndex ?? 0) - 1)
+        }
         return
       }
       if (key.name === 'down' || key.name === 'j') {
-        state.routerDashboardScrollOffset = (state.routerDashboardScrollOffset || 0) + 1
+        if (favorites.length > 0) {
+          state.routerDashboardCursorIndex = Math.min(maxCursor, (state.routerDashboardCursorIndex ?? 0) + 1)
+        }
         return
       }
       if (key.name === 'pageup') {
@@ -1461,27 +1507,16 @@ export function createKeyHandler(ctx) {
         return
       }
       if (key.name === 'home') {
+        state.routerDashboardCursorIndex = 0
         state.routerDashboardScrollOffset = 0
-        return
-      }
-      if (key.name === 's') {
-        try { await cycleRouterDashboardActiveSet(state) } catch {}
         return
       }
       if (key.name === 'i') {
         try { await cycleRouterDashboardProbeMode(state) } catch {}
         return
       }
-      if (key.name === 'r') {
-        restartRouterDashboardDaemon(state)
-        return
-      }
       if (key.name === 'c') {
         clearRouterDashboardRequestLog(state)
-        return
-      }
-      if (key.name === 'p') {
-        toggleRouterDashboardProbePause(state)
         return
       }
       return

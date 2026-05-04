@@ -544,6 +544,7 @@ export async function runApp(cliArgs, config) {
     routerDashboardNoticeTimer: null,
     routerOnboardingScrollOffset: 0,
     routerDashboardEverOpened: false, // 📖 Set to true the first time dashboard opens (used for upgrade-path telemetry)
+    routerDashboardCursorIndex: 0,    // 📖 Cursor index for navigating the favorites list in router dashboard
     // 📖 Custom text filter (Ctrl+P palette → type text → Enter). Ephemeral — not saved to config.
     customTextFilter: null,       // 📖 Active free-text filter string (null = off). Matches model name, ctx, provider key/name.
   }
