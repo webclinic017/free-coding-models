@@ -1,6 +1,6 @@
 <table>
   <tr>
-    <td style="vertical-align: middle; width: 148px;">
+    <td style="vertical-align: middle; width: 200px;">
       <img src="logo.webp" alt="free-coding-models logo" width="128"><br><br>
       <img src="https://img.shields.io/npm/v/free-coding-models?color=76b900&label=npm&logo=npm" alt="npm version"><br>
       <img src="https://img.shields.io/node/v/free-coding-models?color=76b900&logo=node.js" alt="node version"><br>
