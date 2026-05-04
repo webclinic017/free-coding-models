@@ -525,32 +525,19 @@ MIT © [vava](https://github.com/vava-nessa)
 
 
 
-<p align="center">
-  <strong>Contributors</strong><br><br>
-  <a href="https://github.com/vava-nessa"><img src="https://avatars.githubusercontent.com/u/5466264?v=4&s=60" width="60" height="60" style="border-radius:50%" alt="vava-nessa"></a>&nbsp;&nbsp;
-  <a href="https://github.com/erwinh22"><img src="https://avatars.githubusercontent.com/u/6641858?v=4&s=60" width="60" height="60" style="border-radius:50%" alt="erwinh22"></a>&nbsp;&nbsp;
-  <a href="https://github.com/whit3rabbit"><img src="https://avatars.githubusercontent.com/u/12357518?v=4&s=60" width="60" height="60" style="border-radius:50%" alt="whit3rabbit"></a>&nbsp;&nbsp;
-  <a href="https://github.com/skylaweber"><img src="https://avatars.githubusercontent.com/u/172871734?v=4&s=60" width="60" height="60" style="border-radius:50%" alt="skylaweber"></a>&nbsp;&nbsp;
-  <a href="https://github.com/PhucTruong-ctrl"><img src="https://github.com/PhucTruong-ctrl.png?s=60" width="60" height="60" style="border-radius:50%" alt="PhucTruong-ctrl"></a>&nbsp;&nbsp;
-  <a href="https://github.com/chindris-mihai-alexandru"><img src="https://avatars.githubusercontent.com/u/12643176?v=4&s=60" width="60" height="60" style="border-radius:50%" alt="chindris-mihai-alexandru"></a>&nbsp;&nbsp;
-  <a href="https://github.com/serajbaltu"><img src="https://avatars.githubusercontent.com/u/90699173?v=4&s=60" width="60" height="60" style="border-radius:50%" alt="serajbaltu"></a>
-  <br>
-  <sub>
-    <a href="https://github.com/vava-nessa">vava-nessa</a> &middot;
-    <a href="https://github.com/erwinh22">erwinh22</a> &middot;
-    <a href="https://github.com/whit3rabbit">whit3rabbit</a> &middot;
-    <a href="https://github.com/skylaweber">skylaweber</a> &middot;
-    <a href="https://github.com/PhucTruong-ctrl">PhucTruong-ctrl</a> &middot;
-    <a href="https://github.com/chindris-mihai-alexandru">chindris-mihai-alexandru</a> &middot;
-    <a href="https://github.com/serajbaltu">serajbaltu</a>
-  </sub>
-</p>
+## Special thanks to contributors
 
-
-
-<p align="center">
-  <sub>Anonymous usage data collected to improve the tool. No personal information ever.</sub>
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><a href="https://github.com/vava-nessa"><img src="https://avatars.githubusercontent.com/u/5466264?v=4&s=80" width="80" height="80" style="border-radius:50%" alt="vava-nessa"><br><sub><b>vava-nessa</b></sub></a></td>
+    <td align="center"><a href="https://github.com/erwinh22"><img src="https://avatars.githubusercontent.com/u/6641858?v=4&s=80" width="80" height="80" style="border-radius:50%" alt="erwinh22"><br><sub><b>erwinh22</b></sub></a></td>
+    <td align="center"><a href="https://github.com/whit3rabbit"><img src="https://avatars.githubusercontent.com/u/12357518?v=4&s=80" width="80" height="80" style="border-radius:50%" alt="whit3rabbit"><br><sub><b>whit3rabbit</b></sub></a></td>
+    <td align="center"><a href="https://github.com/skylaweber"><img src="https://avatars.githubusercontent.com/u/172871734?v=4&s=80" width="80" height="80" style="border-radius:50%" alt="skylaweber"><br><sub><b>skylaweber</b></sub></a></td>
+    <td align="center"><a href="https://github.com/PhucTruong-ctrl"><img src="https://github.com/PhucTruong-ctrl.png?s=80" width="80" height="80" style="border-radius:50%" alt="PhucTruong-ctrl"><br><sub><b>PhucTruong-ctrl</b></sub></a></td>
+    <td align="center"><a href="https://github.com/chindris-mihai-alexandru"><img src="https://avatars.githubusercontent.com/u/12643176?v=4&s=80" width="80" height="80" style="border-radius:50%" alt="chindris-mihai-alexandru"><br><sub><b>chindris-mihai-alexandru</b></sub></a></td>
+    <td align="center"><a href="https://github.com/serajbaltu"><img src="https://avatars.githubusercontent.com/u/90699173?v=4&s=80" width="80" height="80" style="border-radius:50%" alt="serajbaltu"><br><sub><b>serajbaltu</b></sub></a></td>
+  </tr>
+</table>
 
 ---
 
