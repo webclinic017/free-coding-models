@@ -319,7 +319,7 @@ When a tool mode is active (via `Z`), models incompatible with that tool are hig
 | `Z` | Cycle target tool |
 | `T` | Cycle tier filter |
 | `D` | Cycle provider filter |
-| `E` | Toggle configured-only mode |
+| `E` | Cycle visibility filter (`Active only → Configured only → Usable only`) |
 | `F` | Favorite / unfavorite model |
 | `Y` | Toggle favorites mode (`Normal filter/sort` default ↔ `Pinned + always visible`) |
 | `X` | Clear active custom text filter |

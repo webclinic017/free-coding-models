@@ -1,20 +1,10 @@
-## [0.3.63] - 2026-05-05
+## [0.3.64] - 2026-05-06
 
 ### Fixed
 
-- **Router daemon auth error false positives** — Fixed `health.every([])` returning `true` for empty arrays, which caused all models to be incorrectly marked as AUTH_ERROR when the daemon had no health data yet. Added explicit `health.length > 0` guards before `.every()` checks.
-- **Daemon API key priority** — `getApiKeyForProvider` no longer falls back to shell env vars when a config key exists. The daemon now exclusively uses keys from `~/.free-coding-models.json`, preventing test/fake keys in shell env from overriding real configured keys.
+- **E footer spacing and color** — Fixed the active `E` footer label so the hotkey letter keeps its distinct hotkey color and is separated from the active filter text by a readable space. This makes the active filter state easier to scan in the TUI footer.
 
 ### Changed
 
-- **Shift+R now launches OpenCode** — Pressing Shift+R opens the Router Dashboard AND launches OpenCode with the currently selected model from the main table. If dashboard is already open, just resets scroll. Previously Shift+R only opened the dashboard without launching anything.
-- **Favorites sync to router on launch** — When a model is launched from the TUI, it and the user's full favorites chain are synced to the daemon as the active set via `/sets/fast-coding`.
-- **Router Dashboard install flow** — The "Install Router Endpoint to CLI Tool" button now opens the Install Endpoints overlay directly with `fcm_router` pre-selected, skipping the provider selection phase.
-
-### Added
-
-- **README_ROUTER.md** — New comprehensive documentation for the FCM Router daemon, covering setup, endpoints, routing behavior, and tool configuration.
-
-### Changed (general)
-
-- **CTX column gradient improved** — Context window colorization now goes from red (32k) → orange (64k) → yellow (128k) → green (256k) → cyan/teal fluo (400k) → bold cyan+underline (1M+) so the biggest context windows stand out visually.
+- **Clearer E filter names** — Renamed the `E` cycle from `Working only` / `Best mode` to `Configured only` / `Usable only`. The behavior is unchanged: `Configured only` keeps configured providers visible, while `Usable only` narrows the table to models with healthy status and usable verdicts.
+- **README TUI key reference** — Updated the `E` shortcut documentation to describe the full visibility cycle: `Active only → Configured only → Usable only`.
