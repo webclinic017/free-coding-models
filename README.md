@@ -602,6 +602,7 @@ Telemetry is enabled by default and can be disabled with any of the following:
     <td align="center" width="120"><a href="https://github.com/PhucTruong-ctrl"><img src="https://github.com/PhucTruong-ctrl.png?s=80" width="80" height="80" style="border-radius:50%" alt="PhucTruong-ctrl"></a></td>
     <td align="center" width="120"><a href="https://github.com/chindris-mihai-alexandru"><img src="https://avatars.githubusercontent.com/u/12643176?v=4&s=80" width="80" height="80" style="border-radius:50%" alt="chindris-mihai-alexandru"></a></td>
     <td align="center" width="120"><a href="https://github.com/serajbaltu"><img src="https://avatars.githubusercontent.com/u/90699173?v=4&s=80" width="80" height="80" style="border-radius:50%" alt="serajbaltu"></a></td>
+    <td align="center" width="120"><a href="https://github.com/stgreenb"><img src="https://avatars.githubusercontent.com/u/18483964?v=4&s=80" width="80" height="80" style="border-radius:50%" alt="stgreenb"></a></td>
   </tr>
   <tr>
     <td align="center"><a href="https://github.com/vava-nessa"><sub><b>vava-nessa</b></sub></a></td>
@@ -611,6 +612,7 @@ Telemetry is enabled by default and can be disabled with any of the following:
     <td align="center"><a href="https://github.com/PhucTruong-ctrl"><sub><b>PhucTruong-ctrl</b></sub></a></td>
     <td align="center"><a href="https://github.com/chindris-mihai-alexandru"><sub><b>chindris-mihai-alexandru</b></sub></a></td>
     <td align="center"><a href="https://github.com/serajbaltu"><sub><b>serajbaltu</b></sub></a></td>
+    <td align="center"><a href="https://github.com/stgreenb"><sub><b>stgreenb</b></sub></a></td>
   </tr>
 </table>
 
