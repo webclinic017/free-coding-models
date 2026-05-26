@@ -26,6 +26,8 @@
 - [ ] Deploy production sur `freecodingmodels.vercel.app`
 - [x] Passe React best practices (CSS classes hover, no any, no inline handlers)
 
+<!-- last-updated: 2026-05-26 sprint-1 -->
+
 ### Sprint 2 — Docs
 - [ ] Script `scripts/sync-docs.mjs` (copie `../docs/*.md` → `content/docs/`)
 - [ ] MDX pipeline (Vite plugin + remark/rehype + Shiki Vitesse Dark/Light)
