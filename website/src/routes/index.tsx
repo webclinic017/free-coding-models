@@ -7,6 +7,7 @@ import { FeaturePillars } from "#/components/feature-pillars";
 import { DeploymentCards } from "#/components/deployment-cards";
 import { RouterSection } from "#/components/router-section";
 import { ProviderShowcase } from "#/components/provider-showcase";
+import { InteractiveDemo } from "#/components/interactive-demo";
 import { CtaBottom } from "#/components/cta-bottom";
 
 export const Route = createFileRoute("/")({ component: Landing });
@@ -22,6 +23,7 @@ function Landing() {
 			<DeploymentCards />
 			<RouterSection />
 			<ProviderShowcase />
+			<InteractiveDemo />
 			<CtaBottom />
 		</>
 	);
