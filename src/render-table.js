@@ -103,11 +103,87 @@ export const PROVIDER_COLOR = new Proxy({}, {
   },
 })
 
-// ─── renderTable: mode param controls footer hint text (opencode vs openclaw) ─────────
-export function renderTable(results, pendingPings, frame, cursor = null, sortColumn = 'avg', sortDirection = 'asc', pingInterval = PING_INTERVAL, lastPingTime = Date.now(), mode = 'opencode', tierFilterMode = 0, scrollOffset = 0, terminalRows = 0, terminalCols = 0, originFilterMode = 0, legacyStatus = null, pingMode = 'normal', pingModeSource = 'auto', hideUnconfiguredModels = false, widthWarningStartedAt = null, widthWarningDismissed = false, widthWarningShowCount = 0, settingsUpdateState = 'idle', settingsUpdateLatestVersion = null, legacyFlag = false, startupLatestVersion = null, versionAlertsEnabled = true, favoritesPinnedAndSticky = false, customTextFilter = null, lastReleaseDate = null, legacyFooterHidden = false, verdictFilterMode = 0, healthFilterMode = 0, bestModeOnly = false, routerFooterRunning = false, routerFooterActiveSet = null, routerFooterTodayTokens = 0, routerFooterAllTimeTokens = 0, routerFooterRequests = 0) {
+/**
+ * 📖 renderTable: Render the full TUI table as a string (no side effects).
+ * 📖 Accepts a single options object so adding/removing params never silently breaks call sites.
+ * 📖 `mode` controls footer hint text (opencode vs openclaw).
+ *
+ * @param {{
+ *   results: Array,
+ *   pendingPings: number,
+ *   frame: number,
+ *   cursor: number|null,
+ *   sortColumn: string,
+ *   sortDirection: string,
+ *   pingInterval: number,
+ *   lastPingTime: number,
+ *   mode: string,
+ *   tierFilterMode: number,
+ *   scrollOffset: number,
+ *   terminalRows: number,
+ *   terminalCols: number,
+ *   originFilterMode: number,
+ *   pingMode: string,
+ *   pingModeSource: string,
+ *   hideUnconfiguredModels: boolean,
+ *   widthWarningStartedAt: number|null,
+ *   widthWarningDismissed: boolean,
+ *   settingsUpdateState: string,
+ *   settingsUpdateLatestVersion: string|null,
+ *   startupLatestVersion: string|null,
+ *   versionAlertsEnabled: boolean,
+ *   favoritesPinnedAndSticky: boolean,
+ *   customTextFilter: string|null,
+ *   lastReleaseDate: string|null,
+ *   verdictFilterMode: number,
+ *   healthFilterMode: number,
+ *   bestModeOnly: boolean,
+ *   routerFooterRunning?: boolean,
+ *   routerFooterActiveSet?: string|null,
+ *   routerFooterTodayTokens?: number,
+ *   routerFooterAllTimeTokens?: number,
+ *   routerFooterRequests?: number,
+ * }} opts
+ * @returns {string}
+ */
+export function renderTable({
+  results = [],
+  pendingPings = 0,
+  frame = 0,
+  cursor = null,
+  sortColumn = 'avg',
+  sortDirection = 'asc',
+  pingInterval = PING_INTERVAL,
+  lastPingTime = Date.now(),
+  mode = 'opencode',
+  tierFilterMode = 0,
+  scrollOffset = 0,
+  terminalRows = 0,
+  terminalCols = 0,
+  originFilterMode = 0,
+  pingMode = 'normal',
+  pingModeSource = 'auto',
+  hideUnconfiguredModels = false,
+  widthWarningStartedAt = null,
+  widthWarningDismissed = false,
+  settingsUpdateState = 'idle',
+  settingsUpdateLatestVersion = null,
+  startupLatestVersion = null,
+  versionAlertsEnabled = true,
+  favoritesPinnedAndSticky = false,
+  customTextFilter = null,
+  lastReleaseDate = null,
+  verdictFilterMode = 0,
+  healthFilterMode = 0,
+  bestModeOnly = false,
+  routerFooterRunning = false,
+  routerFooterActiveSet = null,
+  routerFooterTodayTokens = 0,
+  routerFooterAllTimeTokens = 0,
+  routerFooterRequests = 0,
+} = {}) {
   // 📖 Filter out hidden models for display
   const visibleResults = results.filter(r => !r.hidden)
-  void legacyFooterHidden
 
   const up      = visibleResults.filter(r => r.status === 'up').length
   const down    = visibleResults.filter(r => r.status === 'down').length

@@ -1076,7 +1076,7 @@ describe('renderTable health labels', () => {
       mockResult({ label: '404 model', status: 'down', httpCode: '404', pings: [{ ms: 0, code: '404' }], providerKey: 'nvidia', totalTokens: 0 }),
       mockResult({ label: '500 model', status: 'down', httpCode: '500', pings: [{ ms: 0, code: '500' }], providerKey: 'nvidia', totalTokens: 0 }),
     ]
-    const output = renderTable(results, 0, 0)
+    const output = renderTable({ results, pendingPings: 0, frame: 0 })
 
     assert.match(output, /429 TRY LATER/)
     assert.match(output, /410 GONE/)
@@ -1089,7 +1089,7 @@ describe('renderTable health labels', () => {
       mockResult({ label: 'Auth fail', status: 'auth_error', httpCode: '401', pings: [{ ms: 25, code: '401' }], providerKey: 'groq', totalTokens: 0 }),
       mockResult({ label: 'No key', status: 'noauth', httpCode: '401', pings: [{ ms: 25, code: '401' }], providerKey: 'groq', totalTokens: 0 }),
     ]
-    const output = renderTable(results, 0, 0)
+    const output = renderTable({ results, pendingPings: 0, frame: 0 })
 
     assert.match(output, /AUTH FAIL/)
     assert.match(output, /NO KEY/)
@@ -1110,21 +1110,7 @@ describe('renderTable sticky header and footer layout', () => {
     .map((line) => stripAnsi(line).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ''))
 
   it('does not overrun terminal height in the normal table view', () => {
-    const output = renderTable(
-      makeManyResults(),
-      0,
-      0,
-      0,
-      'avg',
-      'asc',
-      10_000,
-      Date.now(),
-      'opencode',
-      0,
-      0,
-      20,
-      140
-    )
+    const output = renderTable({ results: makeManyResults(), cursor: 0, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 20, terminalCols: 140 })
     const lines = visibleLines(output)
 
     assert.equal(lines.length, 20)
@@ -1137,21 +1123,7 @@ describe('renderTable sticky header and footer layout', () => {
   })
 
   it('keeps title, search filters, and column headers visible when scrolled', () => {
-    const output = renderTable(
-      makeManyResults(),
-      0,
-      0,
-      40,
-      'avg',
-      'asc',
-      10_000,
-      Date.now(),
-      'opencode',
-      0,
-      40,
-      20,
-      140
-    )
+    const output = renderTable({ results: makeManyResults(), cursor: 40, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', scrollOffset: 40, terminalRows: 20, terminalCols: 140 })
     const lines = visibleLines(output)
 
     assert.equal(lines.length, 20)
@@ -1161,36 +1133,7 @@ describe('renderTable sticky header and footer layout', () => {
   })
 
   it('reserves space for temporary footer rows without hiding the header', () => {
-    const output = renderTable(
-      makeManyResults(),
-      0,
-      0,
-      0,
-      'avg',
-      'asc',
-      10_000,
-      Date.now(),
-      'opencode',
-      0,
-      0,
-      20,
-      180,
-      0,
-      null,
-      'normal',
-      'auto',
-      false,
-      null,
-      false,
-      0,
-      'idle',
-      null,
-      false,
-      '9.9.9',
-      true,
-      false,
-      'deep'
-    )
+    const output = renderTable({ results: makeManyResults(), cursor: 0, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 20, terminalCols: 180, pingMode: 'normal', pingModeSource: 'auto', settingsUpdateState: 'idle', startupLatestVersion: '9.9.9', versionAlertsEnabled: true, customTextFilter: 'deep' })
     const lines = visibleLines(output)
 
     assert.equal(lines.length, 20)
@@ -1201,21 +1144,7 @@ describe('renderTable sticky header and footer layout', () => {
   })
 
   it('sticks the footer to the bottom when there are few model rows', () => {
-    const output = renderTable(
-      makeManyResults(3),
-      0,
-      0,
-      0,
-      'avg',
-      'asc',
-      10_000,
-      Date.now(),
-      'opencode',
-      0,
-      0,
-      12,
-      140
-    )
+    const output = renderTable({ results: makeManyResults(3), cursor: 0, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 12, terminalCols: 140 })
     const lines = visibleLines(output)
 
     assert.equal(lines.length, 12)
@@ -1227,38 +1156,7 @@ describe('renderTable sticky header and footer layout', () => {
   })
 
   it('always renders the full footer even when an old collapsed-footer flag is passed', () => {
-    const output = renderTable(
-      makeManyResults(10),
-      0,
-      0,
-      0,
-      'avg',
-      'asc',
-      10_000,
-      Date.now(),
-      'opencode',
-      0,
-      0,
-      20,
-      140,
-      0,
-      null,
-      'normal',
-      'auto',
-      false,
-      null,
-      false,
-      0,
-      'idle',
-      null,
-      false,
-      null,
-      true,
-      false,
-      null,
-      null,
-      true
-    )
+    const output = renderTable({ results: makeManyResults(10), cursor: 0, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 20, terminalCols: 140, pingMode: 'normal', pingModeSource: 'auto', settingsUpdateState: 'idle', versionAlertsEnabled: true })
 
     assert.doesNotMatch(output, /Toggle Footer/)
     assert.doesNotMatch(output, /Shift\+R Router|daemon not running/)
@@ -1273,34 +1171,7 @@ describe('renderTable outdated footer banner', () => {
     ]
     const { version: localVersion } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
     const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const output = renderTable(
-      results,
-      0,
-      0,
-      null,
-      'avg',
-      'asc',
-      10_000,
-      Date.now(),
-      'opencode',
-      0,
-      0,
-      20,
-      190,
-      0,
-      null,
-      'normal',
-      'auto',
-      false,
-      null,
-      false,
-      0,
-      'idle',
-      null,
-      false,
-      '9.9.9',
-      true
-    )
+    const output = renderTable({ results: results, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 20, terminalCols: 190, pingMode: 'normal', pingModeSource: 'auto', settingsUpdateState: 'idle', startupLatestVersion: '9.9.9', versionAlertsEnabled: true })
 
     assert.match(output, new RegExp(`UPDATE AVAILABLE — v${escapeRegex(localVersion)} → v9\\.9\\.9`))
     assert.match(output, /Click here or press Shift\+U to update/)
@@ -1313,7 +1184,7 @@ describe('renderTable outdated footer banner', () => {
     const results = [
       mockResult({ providerKey: 'nvidia', totalTokens: 0 }),
     ]
-    const output = renderTable(results, 0, 0, null, 'avg', 'asc', 10_000, Date.now(), 'opencode', 0, 0, 20, 190)
+    const output = renderTable({ results, pendingPings: 0, frame: 0, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 20, terminalCols: 190 })
 
     assert.doesNotMatch(output, /UPDATE AVAILABLE/)
   })
@@ -1322,36 +1193,7 @@ describe('renderTable outdated footer banner', () => {
     const results = [
       mockResult({ providerKey: 'nvidia', totalTokens: 0 }),
     ]
-    const output = renderTable(
-      results,
-      0,
-      0,
-      null,
-      'avg',
-      'asc',
-      10_000,
-      Date.now(),
-      'opencode',
-      0,
-      0,
-      20,
-      190,
-      0,
-      null,
-      'normal',
-      'auto',
-      false,
-      null,
-      false,
-      0,
-      'idle',
-      null,
-      false,
-      null,
-      true,
-      true,
-      'deep'
-    )
+    const output = renderTable({ results: results, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 20, terminalCols: 190, pingMode: 'normal', pingModeSource: 'auto', settingsUpdateState: 'idle', versionAlertsEnabled: true, favoritesPinnedAndSticky: true, customTextFilter: 'deep' })
 
     // 📖 Footer was slimmed: changelog moved to Settings, exit hint moved to Help.
     // 📖 The X-clear filter badge now lives on its own dedicated footer line.
@@ -1362,67 +1204,13 @@ describe('renderTable outdated footer banner', () => {
     const results = [
       mockResult({ providerKey: 'nvidia', totalTokens: 0 }),
     ]
-    const output = renderTable(
-      results,
-      0,
-      0,
-      null,
-      'avg',
-      'asc',
-      10_000,
-      Date.now(),
-      'opencode',
-      0,
-      0,
-      20,
-      190,
-      0,
-      null,
-      'normal',
-      'auto',
-      false,
-      null,
-      false,
-      0,
-      'idle',
-      null,
-      false,
-      '9.9.9',
-      false
-    )
+    const output = renderTable({ results: results, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 20, terminalCols: 190, pingMode: 'normal', pingModeSource: 'auto', settingsUpdateState: 'idle', startupLatestVersion: '9.9.9', versionAlertsEnabled: false })
 
     assert.doesNotMatch(output, /UPDATE AVAILABLE/)
   })
 
   it('skips the narrow-terminal overlay when terminal width is 80 columns or wider', () => {
-    const output = renderTable(
-      [mockResult()],
-      0,
-      0,
-      0,
-      'avg',
-      'asc',
-      10_000,
-      Date.now(),
-      'opencode',
-      0,
-      0,
-      20,
-      120,
-      0,
-      null,
-      'normal',
-      'auto',
-      false,
-      Date.now(),
-      false,
-      0,
-      'idle',
-      null,
-      false,
-      null,
-      true
-    )
+    const output = renderTable({ results: [mockResult()], cursor: 0, sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 20, terminalCols: 120, pingMode: 'normal', pingModeSource: 'auto', widthWarningStartedAt: Date.now(), settingsUpdateState: 'idle', versionAlertsEnabled: true })
 
     assert.doesNotMatch(output, /Please maximize your terminal/)
     assert.match(output, /free-coding-models/)
@@ -1431,12 +1219,7 @@ describe('renderTable outdated footer banner', () => {
 
 describe('renderTable responsive column visibility', () => {
   // 📖 Helper: render with a specific terminalCols value (all other params at sensible defaults)
-  const renderAtWidth = (cols) => renderTable(
-    [mockResult({ providerKey: 'nvidia', totalTokens: 0, pings: [{ ms: 200, code: '200' }] })],
-    0, 0, null, 'avg', 'asc', 10_000, Date.now(), 'opencode',
-    0, 0, 30, cols,
-    0, null, 'normal', 'auto', false, null, false, 0, 'idle', null, false, null, false
-  )
+  const renderAtWidth = (cols) => renderTable({ results: [mockResult({ providerKey: 'nvidia', totalTokens: 0, pings: [{ ms: 200, code: '200' }] })], sortColumn: 'avg', sortDirection: 'asc', pingInterval: 10_000, lastPingTime: Date.now(), mode: 'opencode', terminalRows: 30, terminalCols: cols, pingMode: 'normal', pingModeSource: 'auto', settingsUpdateState: 'idle', versionAlertsEnabled: false })
 
   // 📖 Full row width = 169 cols (12 data cols + 11 separators + 2 margin)
   // 📖 Compact mode (146 cols): wPing 14→9, wAvg 11→8, wStab 11→8, wSource 14→7, wStatus 18→13

@@ -113,6 +113,9 @@ import { PROVIDER_METADATA, ENV_VAR_NAMES, isWindows, isMac } from '../src/provi
 import { parseTelemetryEnv, isTelemetryDebugEnabled, telemetryDebug, ensureTelemetryConfig, getTelemetryDistinctId, getTelemetrySystem, getTelemetryTerminal, isTelemetryEnabled, sendUsageTelemetry } from '../src/telemetry.js'
 import { ensureFavoritesConfig, toFavoriteKey, syncFavoriteFlags, toggleFavoriteModel, reorderFavorite, pruneOrphanedFavorites } from '../src/favorites.js'
 import { checkForUpdateDetailed, checkForUpdate, runUpdate, fetchLastReleaseDate } from './updater.js'
+import { createTuiState, PING_MODE_INTERVALS, PING_MODE_CYCLE, SPEED_MODE_DURATION_MS, IDLE_SLOW_AFTER_MS, intervalToPingMode } from './tui-state.js'
+import { createPingLoop } from './ping-loop.js'
+import { createTuiFilters } from './tui-filters.js'
 import { promptApiKey } from '../src/setup.js'
 import { syncShellEnv, ensureShellRcSource, promptShellEnvMigration, removeShellEnv } from '../src/shell-env.js'
 import { stripAnsi, maskApiKey, displayWidth, padEndDisplay, tintOverlayLines, keepOverlayTargetVisible, sliceOverlayLines, calculateViewport, sortResultsWithPinnedFavorites, adjustScrollOffset } from '../src/render-helpers.js'
@@ -373,175 +376,23 @@ export async function runApp(cliArgs, config) {
     r.totalTokens = tokenTotalsByProviderModel[buildProviderModelTokenKey(r.providerKey, r.modelId)] || 0
   }
 
-  // 📖 Add interactive selection state - cursor index and user's choice
-  // 📖 sortColumn: 'rank'|'tier'|'origin'|'model'|'ping'|'avg'|'status'|'verdict'|'uptime'
-  // 📖 sortDirection: 'asc' (default) or 'desc'
-  // 📖 ping cadence is now mode-driven:
-  // 📖 speed  = 2s for 1 minute bursts
-  // 📖 normal = 10s steady state
-  // 📖 slow   = 30s after 5 minutes of inactivity
-  // 📖 forced = 4s and ignores inactivity / auto slowdowns
-  const PING_MODE_INTERVALS = {
-    speed: 2_000,
-    normal: 10_000,
-    slow: 30_000,
-    forced: 4_000,
-  }
-  const PING_MODE_CYCLE = ['speed', 'normal', 'slow', 'forced']
-  const SPEED_MODE_DURATION_MS = 60_000
-  const IDLE_SLOW_AFTER_MS = 5 * 60_000
-  const now = Date.now()
-
-  const intervalToPingMode = (intervalMs) => {
-    if (intervalMs <= 3000) return 'speed'
-    if (intervalMs <= 5000) return 'forced'
-    if (intervalMs >= 30000) return 'slow'
-    return 'normal'
-  }
-
-   // 📖 tierFilter: current tier filter letter (null = all, 'S' = S+/S, 'A' = A+/A/A-, etc.)
-  const state = {
+  // 📖 Build TUI state via factory — keeps runApp() focused on orchestration, not initialization
+  const state = createTuiState({
     results,
-    pendingPings: 0,
-    frame: 0,
-    cursor: 0,
-    selectedModel: null,
-    sortColumn: config.settings?.sortColumn ?? 'avg',
-    sortDirection: (config.settings?.sortAsc ?? true) ? 'asc' : 'desc',
-    pingInterval: PING_MODE_INTERVALS.speed, // 📖 Effective live interval derived from the active ping mode.
-    pingMode: 'speed',            // 📖 Current ping mode: speed | normal | slow | forced.
-    pingModeSource: 'startup',    // 📖 Why this mode is active: startup | manual | auto | idle | activity.
-    speedModeUntil: now + SPEED_MODE_DURATION_MS, // 📖 Speed bursts auto-fall back to normal after 60 seconds.
-    lastPingTime: now,            // 📖 Track when last ping cycle started
-    lastUserActivityAt: now,      // 📖 Any keypress refreshes this timer; inactivity can force slow mode.
-    resumeSpeedOnActivity: false, // 📖 Set after idle slowdown so the next activity restarts a 60s speed burst.
-    startupLatestVersion: latestVersion, // 📖 Startup auto-check result reused by the footer banner after "skip update".
-    lastReleaseDate: null,               // 📖 Human-readable last npm publish date (fetched asynchronously).
-    versionAlertsEnabled: !isDevMode, // 📖 Dev checkouts should not tell contributors to upgrade the global npm package.
-    mode,                         // 📖 'opencode' or 'openclaw' — controls Enter action
-    tierFilterMode: 0,            // 📖 Index into TIER_CYCLE (0=All, 1=S+, 2=S, ...)
-    originFilterMode: 0,          // 📖 Index into ORIGIN_CYCLE (0=All, then providers)
-    verdictFilterMode: 0,        // 📖 Index into VERDICT_CYCLE (0=All, then verdicts)
-    healthFilterMode: 0,          // 📖 Index into HEALTH_CYCLE (0=All, then health states)
-    hideUnconfiguredModels: config.settings?.hideUnconfiguredModels === true, // 📖 Hide providers with no configured API key when true.
-    bestModeOnly: false,          // 📖 E cycles Normal → Configured only → Usable only (Health UP + Verdict ≤ Slow)
-    favoritesPinnedAndSticky: config.settings?.favoritesPinnedAndSticky === true, // 📖 false by default: favorites follow normal sort/filter rules until Y enables pinned+sticky mode.
-      scrollOffset: 0,              // 📖 First visible model index in viewport
-      terminalRows: process.stdout.rows || 24,  // 📖 Current terminal height
-      terminalCols: process.stdout.columns || 80, // 📖 Current terminal width
-      widthWarningStartedAt: (process.stdout.columns || 80) < WIDTH_WARNING_MIN_COLS ? now : null, // 📖 Start immediately in very narrow viewports.
-    widthWarningDismissed: false, // 📖 Esc hides the narrow-terminal warning early for the current narrow-width session.
-    widthWarningShowCount: 0, // 📖 No longer used — kept for backward compatibility. Warning now shows every time terminal is too small.
-    // 📖 Settings screen state (P key opens it)
-    settingsOpen: false,          // 📖 Whether settings overlay is active
-    settingsCursor: 0,            // 📖 Which provider row is selected in settings
-    settingsEditMode: false,      // 📖 Whether we're in inline key editing mode (edit primary key)
-    settingsAddKeyMode: false,    // 📖 Whether we're in add-key mode (append a new key to provider)
-    settingsEditBuffer: '',       // 📖 Typed characters for the API key being edited
-    settingsErrorMsg: null,       // 📖 Temporary error message to display in settings
-    settingsTestResults: {},      // 📖 { providerKey: 'pending'|'ok'|'auth_error'|'rate_limited'|'no_callable_model'|'fail'|'missing_key'|null }
-    settingsTestDetails: {},      // 📖 Long-form diagnostics shown under Setup Instructions after a Settings key test.
-    settingsUpdateState: 'idle',  // 📖 'idle'|'checking'|'available'|'up-to-date'|'error'|'installing'
-    settingsUpdateLatestVersion: null, // 📖 Latest npm version discovered from manual check
-    settingsUpdateError: null,    // 📖 Last update-check error message for maintenance row
-    config,                       // 📖 Live reference to the config object (updated on save)
-    sessionId,                    // 📖 Per-process analytics link between app_start and later app_use/app_action events.
-    visibleSorted: [],            // 📖 Cached visible+sorted models — shared between render loop and key handlers
-    commandPaletteOpen: false,    // 📖 Whether the Ctrl+P command palette overlay is active.
-    commandPaletteQuery: '',      // 📖 Current command palette search query.
-    commandPaletteCursor: 0,      // 📖 Selected command index in the filtered command list.
-    commandPaletteScrollOffset: 0, // 📖 Vertical scroll offset for the command palette result viewport.
-    commandPaletteResults: [],    // 📖 Cached fuzzy-filtered command entries for the command palette.
-    commandPaletteFrozenTable: null, // 📖 Frozen table snapshot rendered behind the command palette overlay.
-    commandPaletteExpandedIds: new Set(['filters', 'actions']), // 📖 Expanded category IDs (filters + actions open by default for quick access).
-    helpVisible: false,           // 📖 Whether the help overlay (K key) is active
-    settingsScrollOffset: 0,      // 📖 Vertical scroll offset for Settings overlay viewport
-    helpScrollOffset: 0,          // 📖 Vertical scroll offset for Help overlay viewport
-    // 📖 Install Endpoints overlay state (opened from Settings or Command Palette)
-    installEndpointsOpen: false,  // 📖 Whether the install-endpoints overlay is active
-    installEndpointsPhase: 'providers', // 📖 providers | tools | scope | models | result
-    installEndpointsCursor: 0,    // 📖 Selected row within the current install phase
-    installEndpointsScrollOffset: 0, // 📖 Vertical scroll offset for the install overlay viewport
-    installEndpointsProviderKey: null, // 📖 Selected provider for endpoint installation
-    installEndpointsToolMode: null, // 📖 Selected target tool mode
-    installEndpointsConnectionMode: null, // 📖 Direct provider path retained for future install flow state.
-    installEndpointsScope: null,  // 📖 all | selected
-    installEndpointsSelectedModelIds: new Set(), // 📖 Multi-select buffer for the selected-models phase
-    installEndpointsErrorMsg: null, // 📖 Temporary validation/error message inside the install flow
-    installEndpointsResult: null, // 📖 Final install result shown in the result phase
-    // 📖 Missing-tool bootstrap overlay — confirms a one-click install before retrying the launch.
-    toolInstallPromptOpen: false,
-    toolInstallPromptCursor: 0,
-    toolInstallPromptScrollOffset: 0,
-    toolInstallPromptMode: null,
-    toolInstallPromptModel: null,
-    toolInstallPromptPlan: null,
-    toolInstallPromptErrorMsg: null,
-    // 📖 Incompatible model fallback overlay — shown when user presses Enter on a red-highlighted model.
-    // 📖 Offers two options: switch to a compatible tool, or pick a similar SWE-scored model.
-    incompatibleFallbackOpen: false,
-    incompatibleFallbackCursor: 0,
-    incompatibleFallbackScrollOffset: 0,
-    incompatibleFallbackModel: null,        // 📖 The incompatible model the user tried to launch
-    incompatibleFallbackTools: [],           // 📖 Compatible tools for the selected model
-    incompatibleFallbackSimilarModels: [],   // 📖 Similar SWE models compatible with current tool
-    incompatibleFallbackSection: 'tools',    // 📖 'tools' or 'models' — which section cursor is in
-    // 📖 Smart Recommend overlay state (Q key opens it)
-    recommendOpen: false,         // 📖 Whether the recommend overlay is active
-    recommendPhase: 'questionnaire', // 📖 'questionnaire'|'analyzing'|'results' — current phase
-    recommendCursor: 0,           // 📖 Selected question option (0-based index within current question)
-    recommendQuestion: 0,         // 📖 Which question we're on (0=task, 1=priority, 2=context)
-    recommendAnswers: { taskType: null, priority: null, contextBudget: null }, // 📖 User's answers
-    recommendProgress: 0,         // 📖 Analysis progress percentage (0–100)
-    recommendResults: [],         // 📖 Top N recommendations from getTopRecommendations()
-    recommendScrollOffset: 0,     // 📖 Vertical scroll offset for Recommend overlay viewport
-    recommendAnalysisTimer: null, // 📖 setInterval handle for the 10s analysis phase
-    recommendPingTimer: null,     // 📖 setInterval handle for 2 pings/sec during analysis
-    recommendedKeys: new Set(),   // 📖 Set of "providerKey/modelId" for recommended models (shown in main table)
-
-    // 📖 OpenCode sync status (S key in settings)
-    settingsSyncStatus: null,     // 📖 { type: 'success'|'error', msg: string } — shown in settings footer
-    // 📖 Changelog overlay state (N key opens it)
-    changelogOpen: false,         // 📖 Whether the changelog overlay is active
-    changelogScrollOffset: 0,     // 📖 Vertical scroll offset for changelog overlay viewport
-    changelogPhase: 'index',      // 📖 'index' (all versions) | 'details' (specific version)
-    changelogCursor: 0,           // 📖 Selected row in index phase
-    changelogSelectedVersion: null, // 📖 Which version to show details for
-    // 📖 Installed Models overlay state (Command Palette → Installed models)
-    installedModelsOpen: false,   // 📖 Whether the installed models overlay is active
-    installedModelsCursor: 0,     // 📖 Selected row (tool or model)
-    installedModelsScrollOffset: 0, // 📖 Vertical scroll offset for overlay viewport
-    installedModelsData: [],       // 📖 Cached scan results
-    installedModelsErrorMsg: null, // 📖 Error or status message
-    // 📖 Router Dashboard overlay state (Shift+R opens it).
-    routerDashboardOpen: false,
-    routerDashboardStatus: 'idle', // 📖 idle | loading | ready | partial | stopped | stale | unreachable | malformed
-    routerDashboardBaseUrl: null,
-    routerDashboardPort: null,
-    routerDashboardHealth: null,
-    routerDashboardStats: null,
-    routerDashboardError: null,
-    routerDashboardScrollOffset: 0,
-    routerDashboardEvents: [],
-    routerDashboardLiveRequests: [],
-    routerDashboardClearedAt: 0,
-    routerDashboardLastUpdatedAt: null,
-    routerDashboardLastRefreshStartedAt: null,
-    routerDashboardPollTimer: null,
-    routerDashboardEventAbort: null,
-    routerDashboardEventStatus: 'idle',
-    routerDashboardEventError: null,
-    routerDashboardNotice: null,
-    routerDashboardNoticeTimer: null,
-    routerOnboardingScrollOffset: 0,
-    routerDashboardEverOpened: false, // 📖 Set to true the first time dashboard opens (used for upgrade-path telemetry)
-    routerDashboardCursorIndex: 0,    // 📖 Cursor index for navigating the favorites list in router dashboard
-    // 📖 Custom text filter (Ctrl+P palette → type text → Enter). Ephemeral — not saved to config.
-    customTextFilter: null,       // 📖 Active free-text filter string (null = off). Matches model name, ctx, provider key/name.
-  }
+    config,
+    mode,
+    sessionId,
+    latestVersion,
+    isDevMode,
+  })
 
   // 📖 Apply the pre-fetched last release date now that state is initialized
   state.lastReleaseDate = lastReleaseDate
+
+  // 📖 Create ping loop controller and filter engine
+  const { setPingMode, refreshAutoPingMode, noteUserActivity } = createPingLoop(state)
+  const { applyTierFilter, buildOriginCycle } = createTuiFilters(state, { sources, getApiKey, PROVIDER_METADATA })
+  const ORIGIN_CYCLE = buildOriginCycle()
 
   // 📖 Re-clamp viewport on terminal resize
   process.stdout.on('resize', () => {
@@ -567,48 +418,14 @@ export async function runApp(cliArgs, config) {
   let onMouseData = null  // 📖 Mouse data listener — set after createMouseEventHandler
   let pingModel = null
 
+  // 📖 scheduleNextPing: wrapper that defers to the factory version, passing the current runPingCycle.
+  // 📖 Defined here because runPingCycle is created later in runApp() and can't be moved earlier.
   const scheduleNextPing = () => {
     clearTimeout(state.pingIntervalObj)
     const elapsed = Date.now() - state.lastPingTime
     const interval = state.routerDashboardOpen ? 1000 : state.pingInterval
     const delay = Math.max(0, interval - elapsed)
     state.pingIntervalObj = setTimeout(runPingCycle, delay)
-  }
-
-  const setPingMode = (nextMode, source = 'manual') => {
-    const modeInterval = PING_MODE_INTERVALS[nextMode] ?? PING_MODE_INTERVALS.normal
-    state.pingMode = nextMode
-    state.pingModeSource = source
-    state.pingInterval = modeInterval
-    state.speedModeUntil = nextMode === 'speed' ? Date.now() + SPEED_MODE_DURATION_MS : null
-    state.resumeSpeedOnActivity = source === 'idle'
-    if (state.pingIntervalObj) scheduleNextPing()
-  }
-
-  const noteUserActivity = () => {
-    state.lastUserActivityAt = Date.now()
-    if (state.pingMode === 'forced') return
-    if (state.resumeSpeedOnActivity) {
-      setPingMode('speed', 'activity')
-    }
-  }
-
-  const refreshAutoPingMode = () => {
-    const currentTime = Date.now()
-    if (state.pingMode === 'forced') return
-
-    if (state.speedModeUntil && currentTime >= state.speedModeUntil) {
-      setPingMode('normal', 'auto')
-      return
-    }
-
-    if (currentTime - state.lastUserActivityAt >= IDLE_SLOW_AFTER_MS) {
-      if (state.pingMode !== 'slow' || state.pingModeSource !== 'idle') {
-        setPingMode('slow', 'idle')
-      } else {
-        state.resumeSpeedOnActivity = true
-      }
-    }
   }
 
   // 📖 Load cache if available (for faster startup with cached ping results)
@@ -751,75 +568,10 @@ export async function runApp(cliArgs, config) {
   process.on('SIGTERM', () => exit(0))
 
   // 📖 originFilterMode: index into ORIGIN_CYCLE, 0=All, then each provider key in order
-  const ORIGIN_CYCLE = [null, ...Object.keys(sources)]
   const resolvedTierFilter = config.settings?.tierFilter
   state.tierFilterMode = resolvedTierFilter ? Math.max(0, TIER_CYCLE.indexOf(resolvedTierFilter)) : 0
   const resolvedOriginFilter = config.settings?.originFilter
   state.originFilterMode = resolvedOriginFilter ? Math.max(0, ORIGIN_CYCLE.indexOf(resolvedOriginFilter)) : 0
-
-  function applyTierFilter() {
-    const activeTier = TIER_CYCLE[state.tierFilterMode]
-    const activeOrigin = ORIGIN_CYCLE[state.originFilterMode]
-    const activeVerdict = VERDICT_CYCLE[state.verdictFilterMode]
-    const activeHealth = HEALTH_CYCLE[state.healthFilterMode]
-    state.results.forEach(r => {
-      const stickyFavorite = state.favoritesPinnedAndSticky && r.isFavorite
-      // 📖 CLI-only tools (rovo, gemini) and Zen models don't need traditional API keys —
-      // 📖 they authenticate via their own CLI login flow, so "configured only" should never hide them.
-      const providerMeta = PROVIDER_METADATA[r.providerKey]
-      const noKeyNeeded = providerMeta?.cliOnly || providerMeta?.zenOnly
-      // 📖 E toggles "Show only configured & working models":
-      // 📖 hide models where provider has no key, or where the health status is noauth/auth_error (but keep timeout and 429)
-      const badHealth = r.status === 'noauth' || r.status === 'auth_error'
-      const unconfiguredHide = state.hideUnconfiguredModels && !noKeyNeeded && (!getApiKey(state.config, r.providerKey) || badHealth)
-      if (unconfiguredHide) {
-        r.hidden = true
-        return
-      }
-      // 📖 Usable only: only show models with Health UP and Verdict Perfect/Normal/Slow
-      if (state.bestModeOnly) {
-        const bmVerdict = getVerdict(r)
-        const bmVerdictOk = ['Perfect', 'Normal', 'Slow'].includes(bmVerdict)
-        const bmHealthOk = r.status === 'up'
-        if (!bmHealthOk || !bmVerdictOk) {
-          r.hidden = true
-          return
-        }
-      }
-      // 📖 Sticky-favorites mode keeps usable favorites visible regardless of
-      // 📖 tier/provider/text filters, but "Usable only" health still wins above.
-      if (stickyFavorite) {
-        r.hidden = false
-        return
-      }
-      // 📖 Apply tier, origin, verdict, and health filters — model is hidden if it fails any
-      const allowedTiers = (activeTier && TIER_LETTER_MAP[activeTier]) ? TIER_LETTER_MAP[activeTier] : [activeTier]
-      const tierHide = activeTier !== null && !allowedTiers.includes(r.tier)
-      const originHide = activeOrigin !== null && r.providerKey !== activeOrigin
-      // 📖 Verdict filter: match against getVerdict(r) when active
-      const rVerdict = getVerdict(r)
-      const verdictHide = activeVerdict !== null && rVerdict !== activeVerdict
-      // 📖 Health filter: match against r.status when active
-      const healthHide = activeHealth !== null && r.status !== activeHealth
-      if (tierHide || originHide || verdictHide || healthHide) {
-        r.hidden = true
-        return
-      }
-      // 📖 Custom text filter — case-insensitive includes match against model name, ctx, provider key, and provider display name.
-      if (state.customTextFilter) {
-        const q = state.customTextFilter.toLowerCase()
-        const providerName = (sources[r.providerKey]?.name || '').toLowerCase()
-        const match = (r.label || '').toLowerCase().includes(q)
-          || (r.ctx || '').toLowerCase().includes(q)
-          || (r.providerKey || '').toLowerCase().includes(q)
-          || providerName.includes(q)
-        r.hidden = !match
-        return
-      }
-      r.hidden = false
-    })
-    return state.results
-  }
 
   // 📖 Apply initial filters so configured-only mode works on first render
   applyTierFilter()
@@ -1061,84 +813,48 @@ export async function runApp(cliArgs, config) {
     const tableTerminalRows = state.terminalRows
 
     let tableContent = null
+    // 📖 Build renderTable options once per frame — keeps all call sites in sync
+    const tableOpts = {
+      results: state.results,
+      pendingPings: state.pendingPings,
+      frame: state.frame,
+      cursor: state.cursor,
+      sortColumn: state.sortColumn,
+      sortDirection: state.sortDirection,
+      pingInterval: state.pingInterval,
+      lastPingTime: state.lastPingTime,
+      mode: state.mode,
+      tierFilterMode: state.tierFilterMode,
+      scrollOffset: state.scrollOffset,
+      terminalRows: tableTerminalRows,
+      terminalCols: state.terminalCols,
+      originFilterMode: state.originFilterMode,
+      pingMode: state.pingMode,
+      pingModeSource: state.pingModeSource,
+      hideUnconfiguredModels: state.hideUnconfiguredModels,
+      widthWarningStartedAt: state.widthWarningStartedAt,
+      widthWarningDismissed: state.widthWarningDismissed,
+      settingsUpdateState: state.settingsUpdateState,
+      settingsUpdateLatestVersion: state.settingsUpdateLatestVersion,
+      startupLatestVersion: state.startupLatestVersion,
+      versionAlertsEnabled: state.versionAlertsEnabled,
+      favoritesPinnedAndSticky: state.favoritesPinnedAndSticky,
+      customTextFilter: state.customTextFilter,
+      lastReleaseDate: state.lastReleaseDate,
+      verdictFilterMode: state.verdictFilterMode,
+      healthFilterMode: state.healthFilterMode,
+      bestModeOnly: state.bestModeOnly,
+    }
     if (state.commandPaletteOpen) {
       if (!state.commandPaletteFrozenTable) {
         // 📖 Freeze the full table (including countdown and spinner glyphs) while
         // 📖 the command palette is open so the background remains perfectly static.
-        state.commandPaletteFrozenTable = renderTable(
-          state.results,
-          state.pendingPings,
-          state.frame,
-          state.cursor,
-          state.sortColumn,
-          state.sortDirection,
-          state.pingInterval,
-          state.lastPingTime,
-          state.mode,
-          state.tierFilterMode,
-          state.scrollOffset,
-          tableTerminalRows,
-          state.terminalCols,
-          state.originFilterMode,
-          null,
-          state.pingMode,
-          state.pingModeSource,
-          state.hideUnconfiguredModels,
-          state.widthWarningStartedAt,
-          state.widthWarningDismissed,
-          state.widthWarningShowCount,
-          state.settingsUpdateState,
-          state.settingsUpdateLatestVersion,
-          false,
-          state.startupLatestVersion,
-          state.versionAlertsEnabled,
-          state.favoritesPinnedAndSticky,
-          state.customTextFilter,
-          state.lastReleaseDate,
-          false,
-           state.verdictFilterMode,
-          state.healthFilterMode,
-          state.bestModeOnly
-        )
+        state.commandPaletteFrozenTable = renderTable(tableOpts)
       }
       tableContent = state.commandPaletteFrozenTable
     } else {
       state.commandPaletteFrozenTable = null
-      tableContent = renderTable(
-        state.results,
-        state.pendingPings,
-        state.frame,
-        state.cursor,
-        state.sortColumn,
-        state.sortDirection,
-        state.pingInterval,
-        state.lastPingTime,
-        state.mode,
-        state.tierFilterMode,
-        state.scrollOffset,
-        tableTerminalRows,
-        state.terminalCols,
-        state.originFilterMode,
-        null,
-        state.pingMode,
-        state.pingModeSource,
-        state.hideUnconfiguredModels,
-        state.widthWarningStartedAt,
-        state.widthWarningDismissed,
-        state.widthWarningShowCount,
-        state.settingsUpdateState,
-        state.settingsUpdateLatestVersion,
-        false,
-        state.startupLatestVersion,
-        state.versionAlertsEnabled,
-        state.favoritesPinnedAndSticky,
-        state.customTextFilter,
-        state.lastReleaseDate,
-        false,
-         state.verdictFilterMode,
-        state.healthFilterMode,
-        state.bestModeOnly
-      )
+      tableContent = renderTable(tableOpts)
     }
 
     const content = state.settingsOpen
@@ -1185,7 +901,37 @@ export async function runApp(cliArgs, config) {
     pinFavorites: state.favoritesPinnedAndSticky,
   })
 
-      process.stdout.write(ALT_HOME + renderTable(state.results, state.pendingPings, state.frame, state.cursor, state.sortColumn, state.sortDirection, state.pingInterval, state.lastPingTime, state.mode, state.tierFilterMode, state.scrollOffset, state.terminalRows, state.terminalCols, state.originFilterMode, null, state.pingMode, state.pingModeSource, state.hideUnconfiguredModels, state.widthWarningStartedAt, state.widthWarningDismissed, state.widthWarningShowCount, state.settingsUpdateState, state.settingsUpdateLatestVersion, false, state.startupLatestVersion, state.versionAlertsEnabled, state.favoritesPinnedAndSticky, state.customTextFilter, state.lastReleaseDate, false, state.verdictFilterMode, state.healthFilterMode, state.bestModeOnly))
+  process.stdout.write(ALT_HOME + renderTable({
+    results: state.results,
+    pendingPings: state.pendingPings,
+    frame: state.frame,
+    cursor: state.cursor,
+    sortColumn: state.sortColumn,
+    sortDirection: state.sortDirection,
+    pingInterval: state.pingInterval,
+    lastPingTime: state.lastPingTime,
+    mode: state.mode,
+    tierFilterMode: state.tierFilterMode,
+    scrollOffset: state.scrollOffset,
+    terminalRows: state.terminalRows,
+    terminalCols: state.terminalCols,
+    originFilterMode: state.originFilterMode,
+    pingMode: state.pingMode,
+    pingModeSource: state.pingModeSource,
+    hideUnconfiguredModels: state.hideUnconfiguredModels,
+    widthWarningStartedAt: state.widthWarningStartedAt,
+    widthWarningDismissed: state.widthWarningDismissed,
+    settingsUpdateState: state.settingsUpdateState,
+    settingsUpdateLatestVersion: state.settingsUpdateLatestVersion,
+    startupLatestVersion: state.startupLatestVersion,
+    versionAlertsEnabled: state.versionAlertsEnabled,
+    favoritesPinnedAndSticky: state.favoritesPinnedAndSticky,
+    customTextFilter: state.customTextFilter,
+    lastReleaseDate: state.lastReleaseDate,
+    verdictFilterMode: state.verdictFilterMode,
+    healthFilterMode: state.healthFilterMode,
+    bestModeOnly: state.bestModeOnly,
+  }))
   if (process.stdout.isTTY) {
     process.stdout.flush && process.stdout.flush()
   }
