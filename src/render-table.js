@@ -942,9 +942,8 @@ export function renderTable({
     }
   }
 
-  // 📖 Line 2: command palette (highlighted as new) + GitHub link.
-  // 📖 Ctrl+P Cmd Palette uses neon-green-on-dark-green background to highlight the feature.
-  const paletteLabel = chalk.bgRgb(0, 60, 0).rgb(57, 255, 20).bold(' Ctrl+P Cmd Palette ')
+  // 📖 Line 2: command palette (simple color, no background) + GitHub link.
+  const paletteLabel = chalk.rgb(57, 255, 20).bold('Ctrl+P Cmd Palette')
   const starLink = '⭐ ' + themeColors.link('\x1b]8;;https://github.com/vava-nessa/free-coding-models\x1b\\GitHub\x1b]8;;\x1b\\')
   lines.push(
     '  ' + paletteLabel + themeColors.dim(`  •  `) + starLink + themeColors.dim(`  •  `) +
@@ -998,16 +997,11 @@ export function renderTable({
   const releaseLabel = lastReleaseDate
     ? chalk.rgb(255, 182, 193)(`Last release: ${lastReleaseDate}`)
     : ''
-  const benchmarkHint = themeColors.dim('Ctrl+A ') + chalk.rgb(57, 255, 20).bold('⚡ Speed Test')
+  const speedTestLabel = chalk.bgRgb(0, 60, 0).rgb(57, 255, 20).bold(' NEW ⭐️ Ctrl+A 🤖 AI Speed Test ')
 
-  if (releaseLabel) {
-    const leftText = '  ' + releaseLabel
-    const leftPlain = stripAnsi(leftText)
-    const rightPlain = stripAnsi(benchmarkHint)
-    const padding = terminalCols > 0
-      ? Math.max(2, terminalCols - leftPlain.length - rightPlain.length)
-      : 2
-    lines.push(leftText + ' '.repeat(padding) + benchmarkHint)
+  if (releaseLabel || speedTestLabel) {
+    const line = '  ' + speedTestLabel + '  ' + releaseLabel
+    lines.push(line)
   }
   _lastLayout.footerHotkeys = footerHotkeys
 

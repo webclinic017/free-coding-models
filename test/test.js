@@ -1124,8 +1124,9 @@ describe('renderTable sticky header and footer layout', () => {
     assert.match(lines[1], /Model/)
     assert.doesNotMatch(output, /Search "\/"/)
     assert.doesNotMatch(output, /Shift\+R Router|daemon not running|Smart Router is now available/)
-    assert.match(lines.at(-2), /F Favorite/)
-    assert.match(lines.at(-1), /Ctrl\+P Cmd Palette/)
+    assert.match(lines.at(-3), /F Favorite/)
+    assert.match(lines.at(-2), /Ctrl\+P Cmd Palette/)
+    assert.match(lines.at(-1), /AI Speed Test/)
   })
 
   it('keeps title, search filters, and column headers visible when scrolled', () => {
@@ -1156,9 +1157,11 @@ describe('renderTable sticky header and footer layout', () => {
     assert.equal(lines.length, 12)
     assert.match(lines[0], /free-coding-models/)
     assert.match(lines[1], /Model/)
-    assert.ok(lines.slice(5, 10).every((line) => line === ''), 'expected blank padding before sticky footer')
-    assert.match(lines.at(-2), /F Favorite/)
-    assert.match(lines.at(-1), /Ctrl\+P Cmd Palette/)
+    // 3 model rows + 3 footer lines = 6 fixed content lines, blank padding fills the rest
+    assert.ok(lines.slice(5, 9).every((line) => line === ''), 'expected blank padding before sticky footer')
+    assert.match(lines.at(-3), /F Favorite/)
+    assert.match(lines.at(-2), /Ctrl\+P Cmd Palette/)
+    assert.match(lines.at(-1), /AI Speed Test/)
   })
 
   it('always renders the full footer even when an old collapsed-footer flag is passed', () => {
