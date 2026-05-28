@@ -277,6 +277,7 @@ export async function runApp(cliArgs, config) {
       pi: cliArgs.piMode,
       rovo: cliArgs.rovoMode,
       gemini: cliArgs.geminiMode,
+      caveman: cliArgs.cavemanMode,
       copilot: cliArgs.copilotMode,
       forgecode: cliArgs.forgecodeMode,
     }

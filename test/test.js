@@ -1583,7 +1583,8 @@ describe('parseArgs', () => {
       '--hermes',
       '--continue',
       '--cline',
-      '--pi'
+      '--pi',
+      '--caveman'
     ))
     assert.equal(result.aiderMode, true)
     assert.equal(result.crushMode, true)
@@ -1596,6 +1597,7 @@ describe('parseArgs', () => {
     assert.equal(result.continueMode, true)
     assert.equal(result.clineMode, true)
     assert.equal(result.piMode, true)
+    assert.equal(result.cavemanMode, true)
   })
 
   it('detects --no-telemetry flag', () => {
@@ -3049,6 +3051,7 @@ describe('tool compatibility matrix', () => {
     assert.ok(regularTools.includes('openclaw'))
     assert.ok(regularTools.includes('goose'))
     assert.ok(regularTools.includes('amp'))
+    assert.ok(regularTools.includes('caveman'), 'regular models should be compatible with caveman')
     assert.ok(!regularTools.includes('rovo'), 'regular models should NOT be compatible with rovo')
     assert.ok(!regularTools.includes('gemini'), 'regular models should NOT be compatible with gemini')
   })

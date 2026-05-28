@@ -472,6 +472,7 @@ export function parseArgs(argv) {
   const clineMode = flags.includes('--cline')
   const xcodeMode = flags.includes('--xcode')
   const geminiMode = flags.includes('--gemini')
+  const cavemanMode = flags.includes('--caveman')
   const jcodeMode = flags.includes('--jcode')
   const copilotMode = flags.includes('--copilot')
   const forgecodeMode = flags.includes('--forgecode')
@@ -531,6 +532,7 @@ export function parseArgs(argv) {
     xcodeMode,
     rovoMode,
     geminiMode,
+    cavemanMode,
     jcodeMode,
     copilotMode,
     forgecodeMode,

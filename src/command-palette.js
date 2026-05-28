@@ -47,6 +47,7 @@ const TOOL_MODE_DESCRIPTIONS = {
   cline: 'Launch Cline CLI with the selected model.',
   rovo: 'Rovo Dev CLI model (launch with Rovo tool only).',
   gemini: 'Gemini CLI model (launch with Gemini tool only).',
+  caveman: 'Caveman Code — token-efficient coding agent (launch with Caveman tool only).',
   jcode: 'Launch jcode coding agent with the selected model.',
 }
 

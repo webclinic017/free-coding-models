@@ -634,6 +634,47 @@ function buildGeminiEnv(model, config, options = {}) {
   return env
 }
 
+/**
+ * 📖 buildCavemanEnv - Build environment variables for Caveman Code
+ *
+ * Caveman Code supports 20+ providers via OAuth or API keys.
+ * FCM passes the provider's API key through the matching env var
+ * so Caveman Code can use it without re-authenticating.
+ *
+ * Supported env vars (from caveman-code source):
+ * - ANTHROPIC_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY
+ * - MISTRAL_API_KEY, GOOGLE_API_KEY, GEMINI_API_KEY, etc.
+ *
+ * @param {Object} model - Selected model with providerKey
+ * @param {Object} config - Full app config
+ * @param {Object} options - Env options
+ * @returns {NodeJS.ProcessEnv}
+ */
+function buildCavemanEnv(model, config, options = {}) {
+  const providerKey = model.providerKey || 'nvidia'
+  const apiKey = getApiKey(config, providerKey)
+
+  const env = cloneInheritedEnv(process.env, SANITIZED_TOOL_ENV_KEYS)
+
+  if (apiKey && options.includeProviderEnv) {
+    // 📖 Pass the API key through the provider's standard env var name
+    // 📖 Caveman Code recognizes these natively and will use them for the selected model
+    const providerEnvName = ENV_VAR_NAMES[providerKey]
+    if (providerEnvName) {
+      env[providerEnvName] = apiKey
+    }
+    // 📖 Also set OpenAI-compatible defaults for broad compatibility
+    const baseUrl = getProviderBaseUrl(providerKey)
+    if (baseUrl) {
+      env.OPENAI_API_KEY = apiKey
+      env.OPENAI_BASE_URL = baseUrl
+      env.OPENAI_MODEL = model.modelId
+    }
+  }
+
+  return env
+}
+
 function printConfigArtifacts(toolName, artifacts = []) {
   for (const artifact of artifacts) {
     if (!artifact?.path) continue
@@ -881,6 +922,20 @@ export function prepareExternalToolLaunch(mode, model, config, options = {}) {
     }
   }
 
+  if (mode === 'caveman') {
+    const cavemanEnv = buildCavemanEnv(model, config, { includeProviderEnv: options.includeProviderEnv })
+    console.log(chalk.dim(`  📖 Caveman Code will use model: ${model.modelId}`))
+    return {
+      command: 'caveman',
+      args: [],
+      env: { ...env, ...cavemanEnv },
+      apiKey: cavemanEnv.ANTHROPIC_API_KEY || cavemanEnv.OPENAI_API_KEY || null,
+      baseUrl: null,
+      meta,
+      configArtifacts: [],
+    }
+  }
+
   if (mode === 'jcode') {
     // 📖 jcode has a hardcoded model whitelist — bare names like "gpt-oss-120b" are rejected.
     // 📖 Namespaced names like "openai/gpt-oss-120b" bypass it, but only work with native providers.
@@ -1060,6 +1115,11 @@ export async function startExternalTool(mode, model, config) {
 
   if (mode === 'gemini') {
     console.log(chalk.dim(`  📖 Launching Gemini CLI...`))
+    return spawnCommand(resolveLaunchCommand(mode, launchPlan.command), launchPlan.args, launchPlan.env)
+  }
+
+  if (mode === 'caveman') {
+    console.log(chalk.dim(`  📖 Launching Caveman Code...`))
     return spawnCommand(resolveLaunchCommand(mode, launchPlan.command), launchPlan.args, launchPlan.env)
   }
 

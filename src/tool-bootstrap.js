@@ -290,6 +290,17 @@ export const TOOL_BOOTSTRAP_METADATA = {
       },
     },
   },
+  caveman: {
+    binary: 'caveman',
+    docsUrl: 'https://github.com/JuliusBrussee/caveman-code',
+    install: {
+      default: {
+        shellCommand: 'npm install -g @juliusbrussee/caveman-code',
+        summary: 'Install Caveman Code globally via npm.',
+        note: 'After installation, run `caveman /login` to authenticate with your preferred provider (Claude, ChatGPT, Copilot, etc.).',
+      },
+    },
+  },
   jcode: {
     binary: 'jcode',
     docsUrl: 'https://github.com/1jehuang/jcode',
